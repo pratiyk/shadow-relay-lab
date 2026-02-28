@@ -24,7 +24,7 @@ echo "[1] Updating packages and installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y apache2 php libapache2-mod-php git curl sudo cron \
-                   python3 python3-pip python3-venv smbclient ldap-utils
+                   python3 python3-pip python3-venv smbclient ldap-utils rsync
 
 # --- 2. Repository Setup ---
 echo "[2] Cloning Repository..."
@@ -57,7 +57,10 @@ cat << 'EOF' > "$REPO_DIR/web-app/index.php"
     <?php
         if (isset($_GET['page'])) {
             // VULNERABILITY: Local File Inclusion
-            include($_GET['page']);
+            $file = $_GET['page'];
+            // If they didn't provide an extension, we just append one for the basic pages
+            // But this is notoriously vulnerable to path traversal for absolute paths!
+            include($file);
         } else {
             echo "<p>Welcome. Please select a page.</p>";
         }
