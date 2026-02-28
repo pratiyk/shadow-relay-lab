@@ -100,15 +100,28 @@ systemctl restart apache2
 # --- 4. User Configuration ---
 echo "[4] Configuring Users and SSH..."
 if ! id -u "$SVC_USER" >/dev/null 2>&1; then
-    # Create the user from the leaked credentials
     useradd -m -s /bin/bash "$SVC_USER"
-    echo "$SVC_USER:$SVC_PASS" | chpasswd
+    
+    # Create SSH directory
+    mkdir -p /home/$SVC_USER/.ssh
+    
+    # Generate SSH keypair without passphrase
+    ssh-keygen -t rsa -b 2048 -f /home/$SVC_USER/.ssh/id_rsa -N ""
+    
+    # Setup authorized_keys to allow login
+    cp /home/$SVC_USER/.ssh/id_rsa.pub /home/$SVC_USER/.ssh/authorized_keys
+    
+    # VULNERABILITY: The private key is globally readable by www-data (via LFI)
+    chmod 644 /home/$SVC_USER/.ssh/id_rsa
+    chmod 600 /home/$SVC_USER/.ssh/authorized_keys
+    chmod 755 /home/$SVC_USER/.ssh
+    chmod 755 /home/$SVC_USER
+    
+    chown -R $SVC_USER:$SVC_USER /home/$SVC_USER
 fi
 
-# To allow SSH login with the leaked password, ensure PasswordAuth is enabled
-sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-# Remove include config that overrides password auth on newer Ubuntu
-rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf || true
+# Ensure GCP default secure SSH is active (PasswordAuth is no)
+sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 systemctl restart ssh
 
 # --- 5. Privilege Escalation Vector ---
